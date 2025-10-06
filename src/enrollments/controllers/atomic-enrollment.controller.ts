@@ -10,7 +10,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { EnrollmentsService } from '../services/enrollments.service';
-import { CreateEnrollmentDetailDto } from '../dto';
+import {
+  CreateEnrollmentDetailBatchDto,
+  CreateEnrollmentDetailDto,
+} from '../dto';
 import { IdempotencyKey } from '../../common/decorators';
 import { IdempotencyService } from '../../common/services/idempotency.service';
 
@@ -48,6 +51,40 @@ export class AtomicEnrollmentController {
       ...result.data,
       idempotency: {
         key: idempotencyKey,
+        isNew: result.isNew,
+      },
+    };
+  }
+
+  @Post('enroll/batch')
+  @HttpCode(HttpStatus.CREATED)
+  async enrollStudentBatch(
+    @Body() batchDto: CreateEnrollmentDetailBatchDto,
+    @IdempotencyKey() idempotencyKey: string | null,
+  ) {
+    const key = idempotencyKey;
+    if (!key) {
+      throw new BadRequestException(
+        'X-Idempotency-Key header is required for enrollment operations',
+      );
+    }
+
+    if (!batchDto.items?.length) {
+      throw new BadRequestException(
+        'At least one enrollment detail is required',
+      );
+    }
+
+    const operationKey = `enroll-batch:${key}`;
+    const result = await this.idempotencyService.executeWithIdempotency(
+      operationKey,
+      async () =>
+        this.enrollmentsService.atomicEnrollBatch(batchDto, key),
+    );
+    return {
+      ...result.data,
+      idempotency: {
+        key,
         isNew: result.isNew,
       },
     };

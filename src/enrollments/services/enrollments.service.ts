@@ -6,6 +6,7 @@ import {
   CreateEnrollmentDto,
   UpdateEnrollmentDto,
   ListEnrollmentsDto,
+  CreateEnrollmentDetailBatchDto,
   CreateEnrollmentDetailDto,
   UpdateEnrollmentDetailDto,
   ListEnrollmentDetailsDto,
@@ -109,6 +110,18 @@ export class EnrollmentsService {
   ) {
     return firstValueFrom(
       this.client.send('enrollments.atomic.enroll', {
+        data,
+        idempotencyKey,
+      }),
+    );
+  }
+
+  atomicEnrollBatch(
+    data: CreateEnrollmentDetailBatchDto,
+    idempotencyKey: string,
+  ) {
+    return firstValueFrom(
+      this.client.send('enrollments.atomic.enrollBatch', {
         data,
         idempotencyKey,
       }),
