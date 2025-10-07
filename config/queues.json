@@ -1,0 +1,82 @@
+{
+  "enabled": true,
+  "defaultQueue": "standard",
+  "jobTtl": 3600000,
+  "pollingTimeout": 300000,
+  "queues": [
+    {
+      "name": "critical",
+      "displayName": "Critical Gateway Queue",
+      "priority": 10,
+      "timeout": 45,
+      "attempts": 3,
+      "retryDelay": 1500,
+      "estimatedTime": "5-30 seconds",
+      "concurrency": 2,
+      "workers": 2,
+      "processingDelay": 0,
+      "removeOnComplete": 100,
+      "removeOnFail": 50,
+      "urlPatterns": [
+        "/auth/login",
+        "/auth/register",
+        "/auth/logout",
+        "/auth/logout-all",
+        "/auth/change-password",
+        "/auth/update-user"
+      ],
+      "description": "Authentication and stateful operations that must run immediately",
+      "enabled": true
+    },
+    {
+      "name": "standard",
+      "displayName": "Standard Gateway Queue",
+      "priority": 5,
+      "timeout": 90,
+      "attempts": 2,
+      "retryDelay": 2000,
+      "estimatedTime": "15-60 seconds",
+      "concurrency": 3,
+      "workers": 3,
+      "processingDelay": 150,
+      "removeOnComplete": 100,
+      "removeOnFail": 50,
+      "urlPatterns": [
+        "/programs/*",
+        "/calendar/*",
+        "/facilities/*",
+        "/teaching/*",
+        "/enrollments/*",
+        "/assessments/*",
+        "/queues/job/*",
+        "/monitoring/*",
+        "/health",
+        "/testing/*",
+        "/*"
+      ],
+      "description": "Primary queue handling most API traffic through the gateway",
+      "enabled": true
+    },
+    {
+      "name": "background",
+      "displayName": "Background Gateway Queue",
+      "priority": 1,
+      "timeout": 180,
+      "attempts": 1,
+      "retryDelay": 5000,
+      "estimatedTime": "45-120 seconds",
+      "concurrency": 2,
+      "workers": 1,
+      "processingDelay": 500,
+      "removeOnComplete": 50,
+      "removeOnFail": 25,
+      "urlPatterns": [
+        "/reports/*",
+        "/notifications/*",
+        "/analytics/*"
+      ],
+      "description": "Deferred operations and heavy background jobs",
+      "enabled": true
+    }
+  ]
+}

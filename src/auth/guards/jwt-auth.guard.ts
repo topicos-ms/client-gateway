@@ -39,7 +39,26 @@ export class JwtAuthGuard implements CanActivate {
       this.reflector.get<ValidRoles[]>(ROLES_KEY, context.getHandler()) || [];
 
     if (requiredRoles.length && !requiredRoles.includes(ValidRoles.ANY)) {
-      if (!requiredRoles.includes(user.role as ValidRoles)) {
+      const normalizedRequired = requiredRoles.map((role) => role.toUpperCase());
+      const normalizedUserRoles = new Set<string>();
+
+      if (typeof user.role === 'string') {
+        normalizedUserRoles.add(user.role.toUpperCase());
+      }
+
+      if (Array.isArray(user.roles)) {
+        for (const role of user.roles) {
+          if (typeof role === 'string') {
+            normalizedUserRoles.add(role.toUpperCase());
+          }
+        }
+      }
+
+      const hasRequiredRole = normalizedRequired.some((role) =>
+        normalizedUserRoles.has(role),
+      );
+
+      if (!hasRequiredRole) {
         throw new ForbiddenException('Insufficient permissions');
       }
     }

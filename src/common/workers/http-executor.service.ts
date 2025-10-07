@@ -20,10 +20,31 @@ export class HttpExecutorService {
     try {
       // Preparar headers
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
         'User-Agent': 'Internal-Queue-Worker',
         'X-Internal-Request': 'true', // Marca para identificar peticiones internas
       };
+
+      const forwardedHeaders = jobData.headers ?? {};
+
+      if (forwardedHeaders['content-type']) {
+        headers['Content-Type'] = forwardedHeaders['content-type'];
+      } else {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      if (forwardedHeaders.authorization) {
+        headers['Authorization'] = forwardedHeaders.authorization;
+      }
+
+      if (forwardedHeaders['user-agent']) {
+        headers['X-Original-User-Agent'] = forwardedHeaders['user-agent'];
+      }
+
+      if (jobData.clientIp) {
+        headers['X-Forwarded-For'] = jobData.clientIp;
+      }
+
+      headers['X-Job-Id'] = jobData.id;
 
       // Preparar opciones de fetch
       const fetchOptions: RequestInit = {
