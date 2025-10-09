@@ -36,9 +36,9 @@ export class WebSocketGateway
 
   afterInit(server: Server) {
     this.webSocketService.setServer(server);
-    this.logger.log('🚀 WebSocket Gateway initialized');
+    this.logger.log('?? WebSocket Gateway initialized');
 
-    // Configurar cleanup automático cada 5 minutos
+    // Configurar cleanup automatico cada 5 minutos
     setInterval(() => {
       this.webSocketService.cleanupInactiveClients();
       this.jobStatusService.cleanupOldJobs();
@@ -46,7 +46,7 @@ export class WebSocketGateway
   }
 
   handleConnection(client: Socket, ...args: any[]) {
-    this.logger.log(`🔌 Client connected: ${client.id}`);
+    this.logger.log(`?? Client connected: ${client.id}`);
     this.webSocketService.registerClient(client);
 
     // Enviar mensaje de bienvenida
@@ -59,25 +59,38 @@ export class WebSocketGateway
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`🔌 Client disconnected: ${client.id}`);
+    this.logger.log(`?? Client disconnected: ${client.id}`);
     this.webSocketService.unregisterClient(client.id, 'client-disconnect');
   }
 
   /**
-   * Cliente solicita suscribirse a actualizaciones de un job específico
+   * Cliente solicita suscribirse a actualizaciones de un job
    */
   @SubscribeMessage('subscribe')
   handleSubscribe(
     @MessageBody() data: { jobId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (!data?.jobId) {
+    const jobId = data?.jobId;
+
+    if (!jobId) {
       client.emit('error', { message: 'Job ID is required' });
       return;
     }
 
-    this.logger.debug(`📺 Subscription request for job ${data.jobId} from client ${client.id}`);
-    client.emit('subscribe-job', data.jobId);
+    this.logger.debug(`?? Subscription request for job ${jobId} from client ${client.id}`);
+
+    try {
+      this.webSocketService.subscribeClientToJob(client, jobId);
+    } catch (error: any) {
+      const message =
+        error?.message && typeof error.message === 'string'
+          ? error.message
+          : 'Failed to subscribe client to job';
+
+      this.logger.warn(`Subscription error for client ${client.id}: ${message}`);
+      client.emit('error', { message });
+    }
   }
 
   /**
@@ -88,13 +101,26 @@ export class WebSocketGateway
     @MessageBody() data: { jobId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (!data?.jobId) {
+    const jobId = data?.jobId;
+
+    if (!jobId) {
       client.emit('error', { message: 'Job ID is required' });
       return;
     }
 
-    this.logger.debug(`📺 Unsubscription request for job ${data.jobId} from client ${client.id}`);
-    client.emit('unsubscribe-job', data.jobId);
+    this.logger.debug(`?? Unsubscription request for job ${jobId} from client ${client.id}`);
+
+    try {
+      this.webSocketService.unsubscribeClientFromJob(client, jobId);
+    } catch (error: any) {
+      const message =
+        error?.message && typeof error.message === 'string'
+          ? error.message
+          : 'Failed to unsubscribe client from job';
+
+      this.logger.warn(`Unsubscription error for client ${client.id}: ${message}`);
+      client.emit('error', { message });
+    }
   }
 
   /**
@@ -105,34 +131,58 @@ export class WebSocketGateway
     @MessageBody() data: { jobId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (!data?.jobId) {
+    const jobId = data?.jobId;
+
+    if (!jobId) {
       client.emit('error', { message: 'Job ID is required' });
       return;
     }
 
-    this.logger.debug(`📊 Status request for job ${data.jobId} from client ${client.id}`);
-    client.emit('get-job-status', data.jobId);
+    this.logger.debug(`?? Status request for job ${jobId} from client ${client.id}`);
+
+    try {
+      this.webSocketService.sendJobStatus(client, jobId);
+    } catch (error: any) {
+      const message =
+        error?.message && typeof error.message === 'string'
+          ? error.message
+          : 'Failed to retrieve job status';
+
+      this.logger.warn(`Status request error for client ${client.id}: ${message}`);
+      client.emit('error', { message });
+    }
   }
 
   /**
-   * Cliente solicita estadísticas generales del sistema
+   * Cliente solicita estadisticas generales del sistema
    */
   @SubscribeMessage('stats')
   handleGetStats(@ConnectedSocket() client: Socket) {
-    this.logger.debug(`📈 Stats request from client ${client.id}`);
-    client.emit('get-statistics');
+    this.logger.debug(`?? Stats request from client ${client.id}`);
+
+    try {
+      this.webSocketService.sendStatistics(client);
+    } catch (error: any) {
+      const message =
+        error?.message && typeof error.message === 'string'
+          ? error.message
+          : 'Failed to retrieve gateway statistics';
+
+      this.logger.warn(`Statistics request error for client ${client.id}: ${message}`);
+      client.emit('error', { message });
+    }
   }
 
   /**
-   * Ping para mantener conexión activa
+   * Ping para mantener conexion activa
    */
   @SubscribeMessage('ping')
   handlePing(@ConnectedSocket() client: Socket) {
-    client.emit('ping');
+    this.webSocketService.respondToPing(client);
   }
 
   /**
-   * Método para enviar actualizaciones desde otros servicios
+   * Metodo para enviar actualizaciones desde otros servicios
    */
   notifyJobUpdate(jobId: string, status: any) {
     this.jobStatusService.updateJobStatus({
@@ -143,7 +193,7 @@ export class WebSocketGateway
   }
 
   /**
-   * Obtener estadísticas del gateway
+   * Obtener estadisticas del gateway
    */
   getGatewayStats() {
     return {

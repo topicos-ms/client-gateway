@@ -239,7 +239,32 @@ export class RequestRoutingService {
       }),
     },
     { method: 'DELETE', path: '/terms/:id', pattern: 'calendar.terms.remove', buildPayload: (job) => this.requireParam(job, 'id') },
-
+    { method: 'POST', path: '/calendar/managements', pattern: 'calendar.academicYears.create', buildPayload: (job) => job.data ?? {} },
+    { method: 'GET', path: '/calendar/managements', pattern: 'calendar.academicYears.list', buildPayload: (job) => job.queryParams ?? {} },
+    { method: 'GET', path: '/calendar/managements/:id', pattern: 'calendar.academicYears.findOne', buildPayload: (job) => this.requireParam(job, 'id') },
+    {
+      method: 'PATCH',
+      path: '/calendar/managements/:id',
+      pattern: 'calendar.academicYears.update',
+      buildPayload: (job) => ({
+        id: this.requireParam(job, 'id'),
+        updateAcademicYearDto: job.data ?? {},
+      }),
+    },
+    { method: 'DELETE', path: '/calendar/managements/:id', pattern: 'calendar.academicYears.remove', buildPayload: (job) => this.requireParam(job, 'id') },
+    { method: 'POST', path: '/calendar/periods', pattern: 'calendar.terms.create', buildPayload: (job) => job.data ?? {} },
+    { method: 'GET', path: '/calendar/periods', pattern: 'calendar.terms.list', buildPayload: (job) => job.queryParams ?? {} },
+    { method: 'GET', path: '/calendar/periods/:id', pattern: 'calendar.terms.findOne', buildPayload: (job) => this.requireParam(job, 'id') },
+    {
+      method: 'PATCH',
+      path: '/calendar/periods/:id',
+      pattern: 'calendar.terms.update',
+      buildPayload: (job) => ({
+        id: this.requireParam(job, 'id'),
+        updateTermDto: job.data ?? {},
+      }),
+    },
+    { method: 'DELETE', path: '/calendar/periods/:id', pattern: 'calendar.terms.remove', buildPayload: (job) => this.requireParam(job, 'id') },
     // ===== Facilities =====
     { method: 'POST', path: '/classrooms', pattern: 'facilities.classrooms.create', buildPayload: (job) => job.data ?? {} },
     { method: 'GET', path: '/classrooms', pattern: 'facilities.classrooms.list', buildPayload: (job) => job.queryParams ?? {} },

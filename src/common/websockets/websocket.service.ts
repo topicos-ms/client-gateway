@@ -50,64 +50,139 @@ export class WebSocketService {
    * Configura los event listeners para un cliente
    */
   private setupClientListeners(socket: Socket, client: WebSocketClient): void {
-    // Cliente se suscribe a un job específico
+    // Cliente se suscribe a un job especifico
     socket.on('subscribe-job', (jobId: string) => {
-      if (typeof jobId === 'string' && jobId.length > 0) {
-        client.jobIds.add(jobId);
-        this.logger.debug(`📺 Client ${socket.id} subscribed to job ${jobId}`);
-
-        // Enviar estado actual si existe
-        const currentStatus = this.jobStatusService.getJobStatus(jobId);
-        if (currentStatus) {
-          socket.emit('job-update', currentStatus);
-        }
-
-        // Confirmar suscripción
-        socket.emit('subscription-confirmed', { jobId });
+      try {
+        this.subscribeClientToJob(socket, jobId);
+      } catch (error: any) {
+        this.handleClientError(socket, error, 'subscribe-job');
       }
     });
 
     // Cliente se desuscribe de un job
     socket.on('unsubscribe-job', (jobId: string) => {
-      if (typeof jobId === 'string') {
-        client.jobIds.delete(jobId);
-        this.logger.debug(`📺 Client ${socket.id} unsubscribed from job ${jobId}`);
-        socket.emit('unsubscription-confirmed', { jobId });
+      try {
+        this.unsubscribeClientFromJob(socket, jobId);
+      } catch (error: any) {
+        this.handleClientError(socket, error, 'unsubscribe-job');
       }
     });
 
     // Cliente solicita el estado actual de un job
     socket.on('get-job-status', (jobId: string) => {
-      if (typeof jobId === 'string') {
-        const status = this.jobStatusService.getJobStatus(jobId);
-        socket.emit('job-status-response', {
-          jobId,
-          status: status || null,
-        });
+      try {
+        this.sendJobStatus(socket, jobId);
+      } catch (error: any) {
+        this.handleClientError(socket, error, 'get-job-status');
       }
     });
 
-    // Cliente solicita estadísticas generales
+    // Cliente solicita estadisticas generales
     socket.on('get-statistics', () => {
-      const stats = {
-        ...this.jobStatusService.getJobStatistics(),
-        clients: this.clients.size,
-        uptime: process.uptime(),
-      };
-      socket.emit('statistics-response', stats);
+      try {
+        this.sendStatistics(socket);
+      } catch (error: any) {
+        this.handleClientError(socket, error, 'get-statistics');
+      }
     });
 
-    // Ping/Pong para mantener conexión
+    // Ping/Pong para mantener conexion
     socket.on('ping', () => {
-      socket.emit('pong', { timestamp: Date.now() });
+      this.respondToPing(socket);
     });
 
-    // Manejar desconexión
+    // Manejar desconexion
     socket.on('disconnect', (reason) => {
       this.unregisterClient(socket.id, reason);
     });
   }
+  subscribeClientToJob(socket: Socket, jobId: string): void {
+    const normalizedJobId =
+      typeof jobId === 'string' ? jobId.trim() : '';
 
+    if (!normalizedJobId) {
+      throw new Error('Job ID is required');
+    }
+
+    const client = this.clients.get(socket.id);
+    if (!client) {
+      throw new Error('Client session not registered');
+    }
+
+    client.jobIds.add(normalizedJobId);
+    this.logger.debug(`?? Client ${socket.id} subscribed to job ${normalizedJobId}`);
+
+    const currentStatus = this.jobStatusService.getJobStatus(normalizedJobId);
+    if (currentStatus) {
+      socket.emit('job-update', currentStatus);
+    }
+
+    socket.emit('subscription-confirmed', { jobId: normalizedJobId });
+  }
+
+  unsubscribeClientFromJob(socket: Socket, jobId: string): void {
+    const normalizedJobId =
+      typeof jobId === 'string' ? jobId.trim() : '';
+
+    if (!normalizedJobId) {
+      throw new Error('Job ID is required');
+    }
+
+    const client = this.clients.get(socket.id);
+    if (!client) {
+      throw new Error('Client session not registered');
+    }
+
+    if (client.jobIds.delete(normalizedJobId)) {
+      this.logger.debug(`?? Client ${socket.id} unsubscribed from job ${normalizedJobId}`);
+    }
+
+    socket.emit('unsubscription-confirmed', { jobId: normalizedJobId });
+  }
+
+  sendJobStatus(socket: Socket, jobId: string): void {
+    const normalizedJobId =
+      typeof jobId === 'string' ? jobId.trim() : '';
+
+    if (!normalizedJobId) {
+      throw new Error('Job ID is required');
+    }
+
+    const status = this.jobStatusService.getJobStatus(normalizedJobId);
+
+    socket.emit('job-status-response', {
+      jobId: normalizedJobId,
+      status: status || null,
+    });
+  }
+
+  sendStatistics(socket: Socket): void {
+    const stats = {
+      ...this.jobStatusService.getJobStatistics(),
+      clients: this.clients.size,
+      uptime: process.uptime(),
+    };
+
+    socket.emit('statistics-response', stats);
+  }
+
+  respondToPing(socket: Socket): void {
+    socket.emit('pong', { timestamp: Date.now() });
+  }
+
+  private handleClientError(socket: Socket, error: any, context: string): void {
+    const message = (
+      error?.message && typeof error.message === 'string'
+        ? error.message
+        : 'Unexpected error while processing request'
+    );
+
+    this.logger.warn(
+      `?? Client ${socket.id} ${context} handler failed: ${message}`
+    );
+
+    socket.emit('error', { message });
+  }
   /**
    * Desregistra un cliente WebSocket
    */
