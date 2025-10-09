@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DynamicQueueService } from '../queues/dynamic-queue.service';
 import { RedisService } from '../redis/redis.service';
+import { JobData } from '../interceptors/interfaces/job-data.interface';
 
 export interface LoadTestConfig {
   totalJobs: number;
@@ -165,17 +166,25 @@ export class LoadTestService {
 
     try {
       // Crear job en la cola dinámica indicada (critical/standard/background)
-      await this.queueService.addJobToQueue(jobData.queueType, {
+      const loadJob: JobData = {
         id: jobId,
         method: jobData.method,
         url: jobData.url,
+        rawUrl: jobData.url,
         data: jobData.body,
         headers: {
           'content-type': 'application/json',
           'user-agent': 'load-test-client/1.0',
         },
         timestamp: startTime,
-      });
+        message: {
+          pattern: 'queue.test',
+          completionEvent: 'queue.test.completed',
+        },
+        payload: { jobId, body: jobData.body, method: jobData.method, url: jobData.url },
+      };
+
+      await this.queueService.addJobToQueue(jobData.queueType, loadJob);
 
       // Iniciar tracking del job
       void this.trackJobCompletion(testId, jobId, startTime);

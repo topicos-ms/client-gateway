@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Param, Body, Delete } from '@nestjs/common';
 import { DynamicQueueService } from '../queues/dynamic-queue.service';
 import { QueueConfigService } from './queue-config.service';
+import { JobData } from './interfaces/job-data.interface';
 
 @Controller('queue-control')
 export class QueueControlController {
@@ -132,19 +133,25 @@ export class QueueControlController {
     @Param('queueType') queueType: 'critical' | 'standard' | 'background',
   ) {
     const jobId = `test_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const now = Date.now();
 
-    const testJobData = {
+    const testJobData: JobData = {
       id: jobId,
       method: 'GET',
       url: `/test/${queueType}`,
+      rawUrl: `/test/${queueType}`,
       headers: {
         'content-type': 'application/json',
         'user-agent': 'queue-test-client/1.0',
       },
-      timestamp: Date.now(),
+      timestamp: now,
+      message: {
+        pattern: 'queue.test',
+        completionEvent: 'queue.test.completed',
+      },
+      payload: { queueType },
     };
 
-    // Validate queue availability in dynamic system
     if (!this.queueService.isQueueAvailable(queueType)) {
       return {
         error: `Queue '${queueType}' is not available`,

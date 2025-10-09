@@ -12,6 +12,7 @@ import { Inject } from '@nestjs/common';
 import { IQueueConfigRepository, QUEUE_CONFIG_REPOSITORY } from '../queues/queue-config.repository';
 import { DynamicWorkerService } from '../workers/dynamic-worker.service';
 import { QueueDefinition } from '../queues/queue-config.interface';
+import { JobData } from '../interceptors/interfaces/job-data.interface';
 
 @Controller('admin/queues')
 export class QueueAdminController {
@@ -423,15 +424,26 @@ export class QueueAdminController {
     }
 
     const jobId = `test_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const testPayload = testData || { test: true, queueName };
+    const now = Date.now();
 
-    const testJobData = {
+    const testJobData: JobData = {
       id: jobId,
       method: 'GET',
       url: `/test/${queueName}`,
-      data: testData || { test: true, queueName },
-      headers: {},
-      timestamp: Date.now(),
-    };
+      rawUrl: `/test/${queueName}`,
+      data: testPayload,
+      headers: {
+        'content-type': 'application/json',
+        'user-agent': 'queue-admin-test',
+      },
+      timestamp: now,
+      message: {
+        pattern: 'queue.test',
+        completionEvent: 'queue.test.completed',
+      },
+      payload: testPayload,
+    } as const;
 
     try {
       const job = await this.queueService.addJobToQueue(queueName, testJobData);
@@ -477,3 +489,4 @@ export class QueueAdminController {
     };
   }
 }
+

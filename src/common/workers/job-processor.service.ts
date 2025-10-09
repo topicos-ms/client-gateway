@@ -3,7 +3,7 @@ import { Job } from 'bullmq';
 import { JobData } from '../interceptors/interfaces/job-data.interface';
 import { QueueDefinition } from '../queues/queue-config.interface';
 import { RedisService } from '../redis/redis.service';
-import { HttpExecutorService } from './http-executor.service';
+import { MessageDispatcherService } from './message-dispatcher.service';
 import { JobCacheService } from './job-cache.service';
 import {
   CacheMetadata,
@@ -20,7 +20,7 @@ export class JobProcessorService {
 
   constructor(
     private readonly redisService: RedisService,
-    private readonly httpExecutor: HttpExecutorService,
+    private readonly dispatcher: MessageDispatcherService,
     private readonly cache: JobCacheService,
   ) {
     this.resultHistoryLimit = this.resolveNumberFromEnv(
@@ -42,7 +42,7 @@ export class JobProcessorService {
     const workerInfo = workerId ? ` [Worker #${workerId}]` : '';
 
     this.logger.log(
-      `dY"< [${queueName}]${workerInfo} Processing job ${job.id}: ${jobData.method} ${jobData.url}`,
+      `[${queueName}]${workerInfo} Processing job ${job.id}: ${jobData.method} ${jobData.rawUrl}`,
     );
 
     try {
@@ -50,35 +50,19 @@ export class JobProcessorService {
 
       if (result) {
         this.logger.log(
-          `dY'" [${queueName}]${workerInfo} Job ${job.id} served from CACHE`,
+          `[${queueName}]${workerInfo} Job ${job.id} served from CACHE`,
         );
 
-        const errorInfo = this.isSuccessfulResult(result)
-          ? null
-          : this.buildHttpErrorInfo(result);
-        await this.saveJobResult(job, queueName, jobData, workerId, result, errorInfo);
-
-        if (errorInfo) {
-          this.logger.warn(
-            `??O [${queueName}]${workerInfo} Cached job ${job.id} contains non-success response (${result?.statusCode ?? 'unknown'})`,
-          );
-        }
-
+        await this.saveJobResult(job, queueName, jobData, workerId, result, null);
         return result;
       }
 
       this.logger.debug(
-        `dY", [${queueName}]${workerInfo} Cache miss - executing job ${job.id}`,
-      );
-
-      const shouldExecuteReal = this.shouldExecuteRealRequest(jobData);
-      const executionMode = shouldExecuteReal ? 'REAL' : 'SAFE';
-      this.logger.log(
-        `dYO? [${queueName}]${workerInfo} Executing ${executionMode} HTTP request for job ${job.id}`,
+        `[${queueName}]${workerInfo} Cache miss - dispatching job ${job.id} via NATS`,
       );
 
       result = await Promise.race([
-        this.httpExecutor.executeRequest(jobData),
+        this.dispatcher.dispatch(jobData, timeoutMs),
         this.createTimeoutPromise(timeoutMs),
       ]);
 
@@ -90,28 +74,18 @@ export class JobProcessorService {
           );
         });
 
-      const errorInfo = this.isSuccessfulResult(result)
-        ? null
-        : this.buildHttpErrorInfo(result);
+      await this.saveJobResult(job, queueName, jobData, workerId, result, null);
 
-      await this.saveJobResult(job, queueName, jobData, workerId, result, errorInfo);
-
-      if (errorInfo) {
-        this.logger.warn(
-          `??O [${queueName}]${workerInfo} Job ${job.id} completed with non-success response (${result?.statusCode ?? 'unknown'})`,
-        );
-      } else {
-        this.logger.log(
-          `?o. [${queueName}]${workerInfo} Job ${job.id} completed successfully`,
-        );
-      }
+      this.logger.log(
+        `[${queueName}]${workerInfo} Job ${job.id} completed successfully`,
+      );
 
       return result;
     } catch (error) {
       const normalizedError = this.normalizeError(error);
 
       this.logger.error(
-        `??O [${queueName}]${workerInfo} Job ${job.id} failed: ${normalizedError.message}`,
+        `[${queueName}]${workerInfo} Job ${job.id} failed: ${normalizedError.message}`,
       );
 
       await this.saveJobResult(job, queueName, jobData, workerId, null, normalizedError);
@@ -128,42 +102,6 @@ export class JobProcessorService {
     });
   }
 
-  private shouldExecuteRealRequest(jobData: JobData): boolean {
-    const executeReal = process.env.QUEUE_EXECUTE_REAL === 'true';
-
-    if (!executeReal) {
-      return false;
-    }
-
-    const safeEndpoints = [
-      '/auth/register',
-      '/auth/login',
-      '/auth/users',
-      '/courses',
-      '/programs',
-      '/enrollments',
-      '/schedules',
-      '/facilities',
-      '/assessments',
-      '/calendar',
-    ];
-
-    const forbiddenEndpoints = [
-      '/admin/',
-      '/queue-admin/',
-      '/queues/',
-      '/health',
-      '/metrics',
-      '/monitoring',
-    ];
-
-    if (forbiddenEndpoints.some((pattern) => jobData.url.includes(pattern))) {
-      return false;
-    }
-
-    return safeEndpoints.some((pattern) => jobData.url.includes(pattern));
-  }
-
   private async saveJobResult(
     job: Job,
     queueName: string,
@@ -171,45 +109,33 @@ export class JobProcessorService {
     workerId: number | undefined,
     result: any,
     error: JobErrorInfo | null,
-  ): Promise<void> {
-    const jobId = job.id ?? undefined;
-
-    if (!jobId) {
-      this.logger.warn('Missing job id when trying to persist job result');
-      return;
-    }
-
-    const success = !error && this.isSuccessfulResult(result);
-    const status: 'completed' | 'failed' = success ? 'completed' : 'failed';
-
+  ) {
     const record: JobResultRecord = {
-      jobId,
+      jobId: job.id!,
       queueName,
       method: jobData.method,
-      url: jobData.url,
-      status,
-      success,
-      statusCode: typeof result?.statusCode === 'number' ? result.statusCode : error?.statusCode,
-      responseBody: result?.data,
-      responseHeaders: result?.headers,
-      executedAt: result?.executedAt,
+      url: jobData.rawUrl ?? jobData.url,
+      status: error ? 'failed' : 'completed',
+      success: !error,
+      statusCode: error?.statusCode,
+      responseBody: result,
+      responseHeaders: undefined,
+      executedAt: new Date(jobData.timestamp).toISOString(),
       requestBody: jobData.data,
       query: jobData.queryParams,
       cache: this.extractCacheMeta(result),
-      error: error ?? null,
-      attemptsMade: job.attemptsMade,
+      error,
+      attemptsMade: job.attemptsMade ?? 0,
       finishedAt: new Date().toISOString(),
       workerId,
-      result: result,
+      result,
     };
 
-    const payload = JSON.stringify(record);
-    const resultKey = `job:result:${jobId}`;
-    const listKey = success
-      ? 'jobs:history:completed'
-      : 'jobs:history:failed';
-
     try {
+      const resultKey = `job:result:${job.id}`;
+      const listKey = `job:history:${queueName}`;
+      const payload = JSON.stringify(record);
+
       await this.redisService.set(resultKey, payload, this.resultTtlSeconds);
       await this.redisService.lpush(listKey, payload);
 
@@ -217,47 +143,17 @@ export class JobProcessorService {
         await this.redisService.ltrim(listKey, 0, this.resultHistoryLimit - 1);
       }
 
-      this.logger.debug(`dY'_ Job result saved in Redis: ${resultKey}`);
+      this.logger.debug(`Job result saved in Redis: ${resultKey}`);
     } catch (redisError: any) {
       this.logger.error(
-        `??O Failed to persist job result in Redis for ${jobId}: ${redisError?.message ?? redisError}`,
+        `Failed to persist job result in Redis for ${job.id}: ${redisError?.message ?? redisError}`,
       );
     }
   }
 
-  private isSuccessfulResult(result: any): boolean {
-    if (!result) {
-      return false;
-    }
-
-    if (typeof result.success === 'boolean') {
-      return result.success;
-    }
-
-    if (typeof result.statusCode === 'number') {
-      return result.statusCode >= 200 && result.statusCode < 400;
-    }
-
-    return true;
-  }
-
-  private buildHttpErrorInfo(result: any): JobErrorInfo {
-    const statusCode = typeof result?.statusCode === 'number' ? result.statusCode : undefined;
-    const message = statusCode
-      ? `Request finished with status ${statusCode}`
-      : 'Request finished without success flag';
-
-    return {
-      message,
-      statusCode,
-      data: result?.data,
-      type: 'http',
-    };
-  }
-
   private normalizeError(error: unknown): JobErrorInfo {
     if (error instanceof Error) {
-      const type: JobErrorType = error.name === 'AbortError' ? 'timeout' : 'exception';
+      const type: JobErrorType = error.name === 'TimeoutError' ? 'timeout' : 'exception';
       const info: JobErrorInfo = {
         message: error.message,
         type,

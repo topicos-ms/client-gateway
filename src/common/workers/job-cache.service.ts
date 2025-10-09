@@ -20,20 +20,20 @@ export class JobCacheService {
       if (!cacheKey) return null;
 
       const cachedResult = await this.cacheService.get(cacheKey);
-      
+
       if (cachedResult) {
-        this.logger.debug(`🎯 Cache HIT for ${jobData.method} ${jobData.url}`);
-        return { 
-          ...cachedResult, 
-          _cache: { 
-            hit: true, 
-            key: cacheKey, 
-            timestamp: new Date().toISOString() 
-          } 
+        this.logger.debug(`Cache HIT for ${jobData.method} ${jobData.url}`);
+        return {
+          ...cachedResult,
+          _cache: {
+            hit: true,
+            key: cacheKey,
+            timestamp: new Date().toISOString(),
+          },
         };
       }
 
-      this.logger.debug(`❌ Cache MISS for ${jobData.method} ${jobData.url}`);
+      this.logger.debug(`Cache MISS for ${jobData.method} ${jobData.url}`);
       return null;
     } catch (error) {
       this.logger.warn(`Cache read error: ${error.message}`);
@@ -48,20 +48,21 @@ export class JobCacheService {
 
       const ttl = this.cacheKeyBuilder.getTtlForUrl(jobData.url);
       const cacheableResult = this.prepareCacheableResult(result);
-      
+
       await this.cacheService.set(cacheKey, cacheableResult, ttl);
 
-      this.logger.debug(`💾 Cached result for ${jobData.method} ${jobData.url} (TTL: ${ttl}ms)`);
+      this.logger.debug(`Cached result for ${jobData.method} ${jobData.url} (TTL: ${ttl}ms)`);
     } catch (error) {
       this.logger.warn(`Cache write error: ${error.message}`);
     }
   }
 
   private buildCacheKey(jobData: JobData): string | null {
+    const queryParams = this.extractQueryParams(jobData.rawUrl ?? jobData.url);
     return this.cacheKeyBuilder.forHttpRequest(
       jobData.method,
       jobData.url,
-      this.extractQueryParams(jobData.url),
+      queryParams,
       jobData.userId,
     );
   }
@@ -70,11 +71,11 @@ export class JobCacheService {
     try {
       const urlObj = new URL(url, 'http://dummy.com');
       const params: Record<string, any> = {};
-      
+
       urlObj.searchParams.forEach((value, key) => {
         params[key] = value;
       });
-      
+
       return Object.keys(params).length > 0 ? params : undefined;
     } catch {
       return undefined;
@@ -84,13 +85,11 @@ export class JobCacheService {
   private prepareCacheableResult(result: any): any {
     try {
       const cacheable = JSON.parse(JSON.stringify(result));
-      
-      // Remove sensitive information
+
       if (cacheable.token) delete cacheable.token;
       if (cacheable.password) delete cacheable.password;
       if (cacheable.jwt) delete cacheable.jwt;
 
-      // Add cache metadata
       cacheable._cache = {
         cached: true,
         cachedAt: new Date().toISOString(),
@@ -115,7 +114,7 @@ export class JobCacheService {
   async clear(): Promise<void> {
     try {
       await this.cacheService.clear();
-      this.logger.log('🧹 Cache cleared manually');
+      this.logger.log('Cache cleared manually');
     } catch (error) {
       this.logger.error('Error clearing cache:', error);
     }
