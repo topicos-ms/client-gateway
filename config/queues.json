@@ -47,6 +47,7 @@
         "/facilities/*",
         "/teaching/*",
         "/enrollments/*",
+        "/students/*",
         "/assessments/*",
         "/queues/job/*",
         "/monitoring/*",
