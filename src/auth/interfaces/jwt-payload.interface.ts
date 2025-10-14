@@ -7,6 +7,7 @@ export interface JwtPayload {
   role: string;
   roles: string[];
   student_code?: string;
+  study_plan_id?: string;
   teacher_category?: string;
   iat: number;
   exp: number;

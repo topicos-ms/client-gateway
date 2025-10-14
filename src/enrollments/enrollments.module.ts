@@ -6,6 +6,7 @@ import { EnrollmentDetailsController } from './controllers/enrollment-details.co
 import { AcademicValidationsController } from './controllers/academic-validations.controller';
 import { AtomicEnrollmentController } from './controllers/atomic-enrollment.controller';
 import { DatabasePerformanceController } from './controllers/database-performance.controller';
+import { StudentAdvisoryController } from './controllers/student-advisory.controller';
 
 @Module({
   imports: [NatsModule],
@@ -15,6 +16,7 @@ import { DatabasePerformanceController } from './controllers/database-performanc
     AcademicValidationsController,
     AtomicEnrollmentController,
     DatabasePerformanceController,
+    StudentAdvisoryController,
   ],
   providers: [EnrollmentsService],
 })

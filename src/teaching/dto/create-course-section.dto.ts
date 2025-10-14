@@ -10,12 +10,10 @@ export class CreateCourseSectionDto {
   term_id?: string;
 
   @IsUUID()
-  @IsOptional()
-  classroom_id?: string;
+  classroom_id!: string;
 
   @IsUUID()
-  @IsOptional()
-  teacher_id?: string;
+  teacher_id!: string;
 
   @IsString()
   @IsOptional()

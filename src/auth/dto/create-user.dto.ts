@@ -9,6 +9,7 @@ import {
   MaxLength,
   MinLength,
   ValidateIf,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -53,6 +54,11 @@ export class CreateUserDto {
   @IsOptional()
   @ValidateIf((o) => o.role === UserRole.STUDENT)
   studentCode?: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  @ValidateIf((o) => o.role === UserRole.STUDENT)
+  studyPlanId: string;
 
   @IsString()
   @IsOptional()

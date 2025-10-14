@@ -199,4 +199,11 @@ export class EnrollmentsService {
       }),
     );
   }
+
+  // Study plan guidance
+  getRecommendedCourses(payload: { studentId?: string; studentCode?: string }) {
+    return firstValueFrom(
+      this.client.send('enrollments.students.recommendedCourses', payload),
+    );
+  }
 }

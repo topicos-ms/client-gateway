@@ -63,6 +63,40 @@ export class RequestRoutingService {
       }),
     },
     {
+      method: 'GET',
+      path: '/students/recommended-courses',
+      pattern: 'enrollments.students.recommendedCourses',
+      buildPayload: (job) => {
+        const studentIdRaw = job.queryParams?.studentId;
+        const studentCodeRaw = job.queryParams?.studentCode;
+
+        const studentId = Array.isArray(studentIdRaw)
+          ? studentIdRaw[0]
+          : studentIdRaw;
+        const studentCode = Array.isArray(studentCodeRaw)
+          ? studentCodeRaw[0]
+          : studentCodeRaw;
+
+        const normalizedStudentId =
+          typeof studentId === 'string' && studentId.trim().length > 0
+            ? studentId.trim()
+            : undefined;
+        const normalizedStudentCode =
+          typeof studentCode === 'string' && studentCode.trim().length > 0
+            ? studentCode.trim()
+            : undefined;
+
+        if (!normalizedStudentId && !normalizedStudentCode) {
+          throw new Error('Provide studentId or studentCode');
+        }
+
+        return {
+          studentId: normalizedStudentId,
+          studentCode: normalizedStudentCode,
+        };
+      },
+    },
+    {
       method: 'POST',
       path: '/atomic-enrollment/enroll',
       pattern: 'enrollments.atomic.enroll',
