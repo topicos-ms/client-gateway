@@ -37,8 +37,6 @@ export interface JobData {
   /** Timestamp when the job was created */
   timestamp: number;
 
-  /** IP address of the client (for logging/security) */
-  clientIp?: string;
 
   /** Additional contextual data captured from the HTTP request */
   context?: Record<string, any>;

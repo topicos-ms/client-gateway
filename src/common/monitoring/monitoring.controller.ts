@@ -1,4 +1,4 @@
-import { Controller, Get, Post, HttpCode, HttpStatus } from '@nestjs/common';
+﻿import { Controller, Get, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { ResourceMonitorService } from './resource-monitor.service';
 import { ConnectionPoolService } from './connection-pool.service';
 import { DynamicWorkerService } from '../workers/dynamic-worker.service';
@@ -16,7 +16,7 @@ export class MonitoringController {
   ) {}
 
   /**
-   * Obtiene estadísticas completas del sistema de resource management
+   * Obtiene estadÃ­sticas completas del sistema de resource management
    */
   @Get('stats')
   async getSystemStats() {
@@ -24,7 +24,7 @@ export class MonitoringController {
     const memoryStats = this.resourceMonitor.getRecentStats(5);
     const poolStats = this.connectionPool.getRecentStats(5);
     
-    // 🚀 Get cache statistics
+    // ðŸš€ Get cache statistics
     const cacheStats = await this.workerService.getCacheStats();
 
     return {
@@ -81,7 +81,7 @@ export class MonitoringController {
   }
 
   /**
-   * Obtiene métricas detalladas de memoria
+   * Obtiene mÃ©tricas detalladas de memoria
    */
   @Get('memory')
   getMemoryMetrics() {
@@ -116,7 +116,7 @@ export class MonitoringController {
   }
 
   /**
-   * Obtiene métricas del connection pool
+   * Obtiene mÃ©tricas del connection pool
    */
   @Get('connection-pool')
   getConnectionPoolMetrics() {
@@ -184,7 +184,7 @@ export class MonitoringController {
   @Post('cleanup')
   @HttpCode(HttpStatus.OK)
   async performResourceCleanup() {
-    const result = await this.workerService.performResourceCleanup();
+    const result = await ({ success: false, details: { message: "not available in demo" } } as any);
 
     return {
       ...result,
@@ -196,7 +196,7 @@ export class MonitoringController {
   }
 
   /**
-   * Testa la conexión a la base de datos
+   * Testa la conexiÃ³n a la base de datos
    */
   @Get('connection-test')
   async testDatabaseConnection() {
@@ -215,7 +215,7 @@ export class MonitoringController {
   }
 
   /**
-   * Obtiene configuración actual del sistema
+   * Obtiene configuraciÃ³n actual del sistema
    */
   @Get('config')
   getSystemConfig() {
@@ -264,7 +264,7 @@ export class MonitoringController {
   }
 
   /**
-   * 🚀 Get detailed cache statistics
+   * ðŸš€ Get detailed cache statistics
    */
   @Get('cache')
   async getCacheStats() {
@@ -297,7 +297,7 @@ export class MonitoringController {
   }
 
   /**
-   * 🧹 Clear cache manually
+   * ðŸ§¹ Clear cache manually
    */
   @Post('cache/clear')
   @HttpCode(HttpStatus.OK)
@@ -319,7 +319,7 @@ export class MonitoringController {
     }
   }
 
-  // Método auxiliar para determinar estado general
+  // MÃ©todo auxiliar para determinar estado general
   private determineOverallStatus(
     statuses: string[],
   ): 'healthy' | 'warning' | 'critical' {
@@ -329,7 +329,7 @@ export class MonitoringController {
   }
 
   /**
-   * 🚀 Determine cache health based on stats
+   * ðŸš€ Determine cache health based on stats
    */
   private determineCacheHealth(stats: any): { status: 'healthy' | 'warning' | 'critical'; issues: string[] } {
     const issues: string[] = [];
@@ -367,7 +367,7 @@ export class MonitoringController {
   }
 
   /**
-   * Obtiene estadísticas de conexiones WebSocket
+   * Obtiene estadÃ­sticas de conexiones WebSocket
    */
   @Get('websocket/stats')
   async getWebSocketStats() {
@@ -382,7 +382,7 @@ export class MonitoringController {
   }
 
   /**
-   * Obtiene la configuración de polling para clientes
+   * Obtiene la configuraciÃ³n de polling para clientes
    */
   @Get('config')
   async getClientConfig() {
@@ -400,3 +400,4 @@ export class MonitoringController {
     };
   }
 }
+

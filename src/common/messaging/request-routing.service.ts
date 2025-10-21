@@ -20,165 +20,7 @@ export class RequestRoutingService {
 
   private readonly routes: RouteConfig[] = [
     // ===== Enrollments =====
-    { method: 'POST', path: '/enrollments', pattern: 'enrollments.create', buildPayload: (job) => job.data ?? {} },
-    { method: 'GET', path: '/enrollments', pattern: 'enrollments.list', buildPayload: (job) => job.queryParams ?? {} },
-    { method: 'GET', path: '/enrollments/:id', pattern: 'enrollments.findOne', buildPayload: (job) => this.requireParam(job, 'id') },
-    {
-      method: 'PATCH',
-      path: '/enrollments/:id',
-      pattern: 'enrollments.update',
-      buildPayload: (job) => ({ id: this.requireParam(job, 'id'), updateEnrollmentDto: job.data ?? {} }),
-    },
-    { method: 'DELETE', path: '/enrollments/:id', pattern: 'enrollments.remove', buildPayload: (job) => this.requireParam(job, 'id') },
-    { method: 'POST', path: '/enrollment-details', pattern: 'enrollment-details.create', buildPayload: (job) => job.data ?? {} },
-    { method: 'GET', path: '/enrollment-details', pattern: 'enrollment-details.list', buildPayload: (job) => job.queryParams ?? {} },
-    { method: 'GET', path: '/enrollment-details/:id', pattern: 'enrollment-details.findOne', buildPayload: (job) => this.requireParam(job, 'id') },
-    {
-      method: 'PATCH',
-      path: '/enrollment-details/:id',
-      pattern: 'enrollment-details.update',
-      buildPayload: (job) => ({
-        id: this.requireParam(job, 'id'),
-        updateEnrollmentDetailDto: job.data ?? {},
-      }),
-    },
-    { method: 'DELETE', path: '/enrollment-details/:id', pattern: 'enrollment-details.remove', buildPayload: (job) => this.requireParam(job, 'id') },
-    {
-      method: 'GET',
-      path: '/academic-validations/prerequisites/check',
-      pattern: 'enrollments.academic.checkPrerequisites',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        courseId: this.requireQuery(job, 'courseId'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/academic-validations/enrollment/validate',
-      pattern: 'enrollments.academic.validateEnrollment',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        courseSectionId: this.requireQuery(job, 'courseSectionId'),
-        termId: this.requireQuery(job, 'termId'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/students/recommended-courses',
-      pattern: 'enrollments.students.recommendedCourses',
-      buildPayload: (job) => {
-        const studentIdRaw = job.queryParams?.studentId;
-        const studentCodeRaw = job.queryParams?.studentCode;
-
-        const studentId = Array.isArray(studentIdRaw)
-          ? studentIdRaw[0]
-          : studentIdRaw;
-        const studentCode = Array.isArray(studentCodeRaw)
-          ? studentCodeRaw[0]
-          : studentCodeRaw;
-
-        const normalizedStudentId =
-          typeof studentId === 'string' && studentId.trim().length > 0
-            ? studentId.trim()
-            : undefined;
-        const normalizedStudentCode =
-          typeof studentCode === 'string' && studentCode.trim().length > 0
-            ? studentCode.trim()
-            : undefined;
-
-        if (!normalizedStudentId && !normalizedStudentCode) {
-          throw new Error('Provide studentId or studentCode');
-        }
-
-        return {
-          studentId: normalizedStudentId,
-          studentCode: normalizedStudentCode,
-        };
-      },
-    },
-    {
-      method: 'POST',
-      path: '/atomic-enrollment/enroll',
-      pattern: 'enrollments.atomic.enroll',
-      buildPayload: (job) => ({
-        data: job.data ?? {},
-        idempotencyKey: this.requireHeader(job, 'x-idempotency-key'),
-      }),
-    },
-    {
-      method: 'POST',
-      path: '/atomic-enrollment/enroll/batch',
-      pattern: 'enrollments.atomic.enrollBatch',
-      buildPayload: (job) => ({
-        data: job.data ?? {},
-        idempotencyKey: this.requireHeader(job, 'x-idempotency-key'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/atomic-enrollment/course-section/:id/quota-status',
-      pattern: 'enrollments.atomic.quotaStatus',
-      buildPayload: (job) => ({ courseSectionId: this.requireParam(job, 'id') }),
-    },
-    { method: 'GET', path: '/atomic-enrollment/idempotency/stats', pattern: 'enrollments.atomic.idempotencyStats', buildPayload: () => ({}) },
-    {
-      method: 'GET',
-      path: '/database-performance/prerequisites',
-      pattern: 'enrollments.performance.prerequisites',
-      buildPayload: (job) => ({ courseId: this.requireQuery(job, 'courseId') }),
-    },
-    {
-      method: 'GET',
-      path: '/database-performance/approved-courses',
-      pattern: 'enrollments.performance.approvedCourses',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        courseIds: this.requireQuery(job, 'courseIds'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/database-performance/schedules',
-      pattern: 'enrollments.performance.schedules',
-      buildPayload: (job) => ({ courseSectionIds: this.requireQuery(job, 'courseSectionIds') }),
-    },
-    {
-      method: 'GET',
-      path: '/database-performance/enrollment-count',
-      pattern: 'enrollments.performance.enrollmentCount',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        termId: this.requireQuery(job, 'termId'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/database-performance/batch-prerequisites',
-      pattern: 'enrollments.performance.batchPrerequisites',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        courseIds: this.requireQuery(job, 'courseIds'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/database-performance/has-passed',
-      pattern: 'enrollments.performance.hasPassed',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        courseId: this.requireQuery(job, 'courseId'),
-      }),
-    },
-    {
-      method: 'GET',
-      path: '/database-performance/student-enrollment-details',
-      pattern: 'enrollments.performance.studentEnrollmentDetails',
-      buildPayload: (job) => ({
-        studentId: this.requireQuery(job, 'studentId'),
-        termId: this.requireQuery(job, 'termId'),
-      }),
-    },
-
+    ...this.buildEnrollmentRoutes(),
     // ===== Programs =====
     { method: 'POST', path: '/degree-programs', pattern: 'programs.degreePrograms.create', buildPayload: (job) => job.data ?? {} },
     { method: 'GET', path: '/degree-programs', pattern: 'programs.degreePrograms.list', buildPayload: (job) => job.queryParams ?? {} },
@@ -398,6 +240,147 @@ export class RequestRoutingService {
       buildPayload: (job) => ({ userId: this.requireUserId(job) }),
     },
   ];
+
+  private buildEnrollmentRoutes(): RouteConfig[] {
+    return [
+      { method: 'POST', path: '/enrollments', pattern: 'enrollments.create', buildPayload: (job) => job.data ?? {} },
+      { method: 'GET', path: '/enrollments', pattern: 'enrollments.list', buildPayload: (job) => job.queryParams ?? {} },
+      { method: 'GET', path: '/enrollments/:id', pattern: 'enrollments.findOne', buildPayload: (job) => this.requireParam(job, 'id') },
+      {
+        method: 'PATCH',
+        path: '/enrollments/:id',
+        pattern: 'enrollments.update',
+        buildPayload: (job) => ({ id: this.requireParam(job, 'id'), updateEnrollmentDto: job.data ?? {} }),
+      },
+      { method: 'DELETE', path: '/enrollments/:id', pattern: 'enrollments.remove', buildPayload: (job) => this.requireParam(job, 'id') },
+      { method: 'POST', path: '/enrollment-details', pattern: 'enrollment-details.create', buildPayload: (job) => job.data ?? {} },
+      { method: 'GET', path: '/enrollment-details', pattern: 'enrollment-details.list', buildPayload: (job) => job.queryParams ?? {} },
+      { method: 'GET', path: '/enrollment-details/:id', pattern: 'enrollment-details.findOne', buildPayload: (job) => this.requireParam(job, 'id') },
+      {
+        method: 'PATCH',
+        path: '/enrollment-details/:id',
+        pattern: 'enrollment-details.update',
+        buildPayload: (job) => ({ id: this.requireParam(job, 'id'), updateEnrollmentDetailDto: job.data ?? {} }),
+      },
+      { method: 'DELETE', path: '/enrollment-details/:id', pattern: 'enrollment-details.remove', buildPayload: (job) => this.requireParam(job, 'id') },
+      {
+        method: 'GET',
+        path: '/academic-validations/prerequisites/check',
+        pattern: 'enrollments.academic.checkPrerequisites',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          courseId: this.requireQuery(job, 'courseId'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/academic-validations/enrollment/validate',
+        pattern: 'enrollments.academic.validateEnrollment',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          courseSectionId: this.requireQuery(job, 'courseSectionId'),
+          termId: this.requireQuery(job, 'termId'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/students/recommended-courses',
+        pattern: 'enrollments.students.recommendedCourses',
+        buildPayload: (job) => {
+          const studentIdRaw = job.queryParams?.studentId;
+          const studentCodeRaw = job.queryParams?.studentCode;
+          const studentId = Array.isArray(studentIdRaw) ? studentIdRaw[0] : studentIdRaw;
+          const studentCode = Array.isArray(studentCodeRaw) ? studentCodeRaw[0] : studentCodeRaw;
+          const normalizedStudentId = typeof studentId === 'string' && studentId.trim().length > 0 ? studentId.trim() : undefined;
+          const normalizedStudentCode = typeof studentCode === 'string' && studentCode.trim().length > 0 ? studentCode.trim() : undefined;
+          if (!normalizedStudentId && !normalizedStudentCode) {
+            throw new Error('Provide studentId or studentCode');
+          }
+          return {
+            studentId: normalizedStudentId,
+            studentCode: normalizedStudentCode,
+          };
+        },
+      },
+      {
+        method: 'POST',
+        path: '/atomic-enrollment/enroll',
+        pattern: 'enrollments.atomic.enroll',
+        buildPayload: (job) => ({
+          data: job.data ?? {},
+          idempotencyKey: this.requireHeader(job, 'x-idempotency-key'),
+        }),
+      },
+      {
+        method: 'POST',
+        path: '/atomic-enrollment/enroll/batch',
+        pattern: 'enrollments.atomic.enrollBatch',
+        buildPayload: (job) => ({
+          data: job.data ?? {},
+          idempotencyKey: this.requireHeader(job, 'x-idempotency-key'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/atomic-enrollment/course-section/:id/quota-status',
+        pattern: 'enrollments.atomic.quotaStatus',
+        buildPayload: (job) => ({ courseSectionId: this.requireParam(job, 'id') }),
+      },
+      { method: 'GET', path: '/atomic-enrollment/idempotency/stats', pattern: 'enrollments.atomic.idempotencyStats', buildPayload: () => ({}) },
+      { method: 'GET', path: '/database-performance/prerequisites', pattern: 'enrollments.performance.prerequisites', buildPayload: (job) => ({ courseId: this.requireQuery(job, 'courseId') }) },
+      {
+        method: 'GET',
+        path: '/database-performance/approved-courses',
+        pattern: 'enrollments.performance.approvedCourses',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          courseIds: this.requireQuery(job, 'courseIds'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/database-performance/schedules',
+        pattern: 'enrollments.performance.schedules',
+        buildPayload: (job) => ({ courseSectionIds: this.requireQuery(job, 'courseSectionIds') }),
+      },
+      {
+        method: 'GET',
+        path: '/database-performance/enrollment-count',
+        pattern: 'enrollments.performance.enrollmentCount',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          termId: this.requireQuery(job, 'termId'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/database-performance/batch-prerequisites',
+        pattern: 'enrollments.performance.batchPrerequisites',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          courseIds: this.requireQuery(job, 'courseIds'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/database-performance/has-passed',
+        pattern: 'enrollments.performance.hasPassed',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          courseId: this.requireQuery(job, 'courseId'),
+        }),
+      },
+      {
+        method: 'GET',
+        path: '/database-performance/student-enrollment-details',
+        pattern: 'enrollments.performance.studentEnrollmentDetails',
+        buildPayload: (job) => ({
+          studentId: this.requireQuery(job, 'studentId'),
+          termId: this.requireQuery(job, 'termId'),
+        }),
+      },
+    ];
+  }
 
   resolve(job: JobData): RouteResolution | null {
     const method = job.method.toUpperCase();

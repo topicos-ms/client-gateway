@@ -1,8 +1,8 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { JobData } from '../interceptors/interfaces/job-data.interface';
-import { ICacheService } from '../cache/interfaces/cache.interface';
-import { CACHE_SERVICE_TOKEN } from '../cache/interfaces/cache.tokens';
-import { CacheKeyBuilder } from '../cache/strategies/http-cache-key.strategy';
+﻿import { Injectable, Logger, Inject } from '@nestjs/common';
+import { JobData } from '../../interceptors/interfaces/job-data.interface';
+import { ICacheService } from '../../cache/interfaces/cache.interface';
+import { CACHE_SERVICE_TOKEN } from '../../cache/interfaces/cache.tokens';
+import { CacheKeyBuilder } from '../../cache/strategies/http-cache-key.strategy';
 
 @Injectable()
 export class JobCacheService {
@@ -120,3 +120,4 @@ export class JobCacheService {
     }
   }
 }
+

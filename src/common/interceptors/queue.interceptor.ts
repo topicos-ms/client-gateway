@@ -12,6 +12,7 @@ import { QueueConfigService } from './queue-config.service';
 import { JobStatusService } from '../websockets/job-status.service';
 import { JobData, QueueResponse } from './interfaces/job-data.interface';
 import { RequestRoutingService } from '../messaging/request-routing.service';
+import { QueueDefinition } from '../queues/queue-config.interface';
 
 @Injectable()
 export class QueueInterceptor implements NestInterceptor {
@@ -25,103 +26,108 @@ export class QueueInterceptor implements NestInterceptor {
   ) {}
 
   async intercept(
-    context: ExecutionContext,
-    next: CallHandler,
+    context: ExecutionContext, // Contexto Nest de la petición
+    next: CallHandler, // Siguiente manejador si no encolamos
   ): Promise<Observable<any>> {
-    const httpContext = context.switchToHttp();
-    const request = httpContext.getRequest<Request>();
-    const response = httpContext.getResponse<Response>();
+    const httpContext = context.switchToHttp(); // Cambia a contexto HTTP
+    const request = httpContext.getRequest<Request>(); // Obtiene Request de Express
+    const response = httpContext.getResponse<Response>(); // Obtiene Response de Express
 
-    const { method, url } = request;
+    const { method, url } = request; // Método y URL originales
+    const path = request.path ?? url; // Path normalizado (sin querystring)
 
     if (!this.queueConfig.isQueueEnabled()) {
-      return next.handle();
+      return next.handle(); // Si colas deshabilitadas, procesa directo
     }
 
-    if (request.headers['x-internal-request'] === 'true') {
-      this.logger.debug(`Internal worker request bypassed: ${method} ${url}`);
-      return next.handle();
-    }
+    // All requests pass through the queue system. No internal bypass.
 
-    if (this.shouldExcludeFromQueue(request.path ?? url)) {
-      this.logger.debug(`Excluded from queue: ${method} ${url}`);
-      return next.handle();
+    if (this.shouldExcludeFromQueue(path)) {
+      this.logger.debug(`Excluded from queue: ${method} ${path}`); // Ruta excluida
+      return next.handle(); // Procesa directo
     }
 
     try {
-      const jobId = this.generateJobId();
-      const jobData: JobData = {
-        id: jobId,
-        method,
-        url: request.path ?? url,
-        rawUrl: request.originalUrl ?? url,
-        data: this.extractRequestData(method, request.body, request.query),
-        queryParams: Object.keys(request.query).length > 0 ? request.query : undefined,
-        params: Object.keys(request.params || {}).length > 0 ? request.params : undefined,
-        headers: this.normalizeHeaders(request.headers),
-        userId: this.extractUserId(request.headers),
-        timestamp: Date.now(),
-        clientIp: this.extractClientIp(request),
-        context: this.extractRequestContext(request),
-      };
+      const jobId = this.generateJobId(); // ID único del job
+      const jobData = this.buildJobData(request, method, url, jobId); // Construye JobData
 
-      if (jobData.context && Object.keys(jobData.context).length === 0) {
-        delete jobData.context;
-      }
-
-      const routeResolution = this.routingService.resolve(jobData);
+      const routeResolution = this.routingService.resolve(jobData); // Resuelve patrón NATS y payload
       if (!routeResolution) {
         this.logger.warn(
-          `No async routing configured for ${method} ${request.path ?? url}, processing synchronously`,
+          `No async routing configured for ${method} ${path}, processing synchronously`, // Sin regla → directo
         );
         return next.handle();
       }
 
-      jobData.message = routeResolution.message;
-      jobData.payload = routeResolution.payload;
+      jobData.message = routeResolution.message; // Asigna patrón
+      jobData.payload = routeResolution.payload; // Asigna payload
 
-      const queueName = await this.queueService.determineQueueForUrl(jobData.url);
-      const queueDef = this.queueService.getQueueDefinition(queueName);
+      const queueName = await this.queueService.determineQueueForUrl(jobData.url); // Elige cola
+      const queueDef = this.queueService.getQueueDefinition(queueName); // Lee definición de la cola
 
       if (!this.queueService.isQueueAvailable(queueName)) {
-        this.logger.warn(`Queue '${queueName}' not available, falling back to processing`);
+        this.logger.warn(`Queue '${queueName}' not available, falling back to processing`); // Cola no disponible
         return next.handle();
       }
 
       await this.queueService.addJobToQueue(queueName, jobData, {
-        priority: queueDef?.priority,
-        timeout: queueDef ? queueDef.timeout * 1000 : 60000,
+        priority: queueDef?.priority, // Prioridad
+        timeout: queueDef ? queueDef.timeout * 1000 : 60000, // Timeout ms
       });
 
       this.logger.log(
-        `Job ${jobId} queued in '${queueName}' queue for ${method} ${request.originalUrl ?? url}`,
+        `Job ${jobId} queued in '${queueName}' queue for ${method} ${request.originalUrl ?? url}`, // Log encolado
       );
 
-      this.jobStatusService.markJobQueued(jobId, queueName);
+      this.jobStatusService.markJobQueued(jobId, queueName); // Marca estado 'queued'
 
-      const queueResponse: QueueResponse = {
-        jobId,
-        status: 'queued',
-        estimatedTime: queueDef?.estimatedTime || 'Unknown',
-        checkStatusUrl: `/queues/job/${jobId}/status`,
-        queueType: queueName as any,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          timeout: queueDef?.timeout || 60,
-          priority: queueDef?.priority || 1,
-          retryCount: 0,
-        },
-      };
-
-      response.status(202);
-      return of(queueResponse);
+      response.status(202); // 202 Accepted
+      return of(this.buildQueueResponse(jobId, queueName, queueDef)); // Devuelve metadata del job
     } catch (error) {
       this.logger.error(
-        `Error intercepting request ${method} ${url}:`,
+        `Error intercepting request ${method} ${url}:`, // Log de error
         error,
       );
-      return next.handle();
+      return next.handle(); // No bloquea: procesa directo
     }
+  }
+
+  private buildJobData(request: Request, method: string, url: string, jobId: string): JobData {
+    const queryParams = Object.keys(request.query).length > 0 ? request.query : undefined;
+    const routeParams = Object.keys(request.params || {}).length > 0 ? request.params : undefined;
+    const headers = this.normalizeHeaders(request.headers);
+    const userId = this.extractUserId(request.headers);
+    const context = this.extractRequestContext(request);
+
+    return {
+      id: jobId,
+      method,
+      url: request.path ?? url,
+      rawUrl: request.originalUrl ?? url,
+      data: this.extractRequestData(method, request.body),
+      queryParams,
+      params: routeParams,
+      headers,
+      userId,
+      timestamp: Date.now(),
+      context,
+    };
+  }
+
+  private buildQueueResponse(jobId: string, queueName: string, queueDef?: QueueDefinition): QueueResponse {
+    return {
+      jobId,
+      status: 'queued',
+      estimatedTime: queueDef?.estimatedTime || 'Unknown',
+      checkStatusUrl: `/queues/job/${jobId}/status`,
+      queueType: queueName as any,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        timeout: queueDef?.timeout || 60,
+        priority: queueDef?.priority || 1,
+        retryCount: 0,
+      },
+    };
   }
 
   private shouldExcludeFromQueue(url: string): boolean {
@@ -153,17 +159,6 @@ export class QueueInterceptor implements NestInterceptor {
     }
   }
 
-  private extractClientIp(request: any): string {
-    return (
-      request.headers['x-forwarded-for']?.toString().split(',')[0] ||
-      request.headers['x-real-ip']?.toString() ||
-      request.connection?.remoteAddress ||
-      request.socket?.remoteAddress ||
-      request.ip ||
-      'unknown'
-    );
-  }
-
   private normalizeHeaders(headers: Request['headers']): Record<string, string> {
     const normalized: Record<string, string> = {};
     Object.entries(headers || {}).forEach(([key, value]) => {
@@ -188,17 +183,10 @@ export class QueueInterceptor implements NestInterceptor {
     return Object.keys(context).length > 0 ? context : undefined;
   }
 
-  private extractRequestData(method: string, body: any, queryParams: any): any {
-    switch (method.toUpperCase()) {
-      case 'GET':
-      case 'DELETE':
-        return undefined;
-      case 'POST':
-      case 'PUT':
-      case 'PATCH':
-        return body ?? {};
-      default:
-        return body ?? {};
-    }
+  private extractRequestData(method: string, body: any): any {
+    const writeMethods = method ? method.toUpperCase() : '';
+    return writeMethods === 'POST' || writeMethods === 'PUT' || writeMethods === 'PATCH'
+      ? (body ?? {})
+      : undefined;
   }
 }

@@ -1,16 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { JobData } from '../interceptors/interfaces/job-data.interface';
-import { QueueDefinition } from '../queues/queue-config.interface';
-import { RedisService } from '../redis/redis.service';
+import { JobData } from '../../interceptors/interfaces/job-data.interface';
+import { QueueDefinition } from '../../queues/queue-config.interface';
+import { RedisService } from '../../redis/redis.service';
 import { MessageDispatcherService } from './message-dispatcher.service';
-import { JobCacheService } from './job-cache.service';
+import { JobCacheService } from '../cache/job-cache.service';
 import {
   CacheMetadata,
   JobErrorInfo,
   JobErrorType,
   JobResultRecord,
-} from './interfaces/job-result.interface';
+} from '../interfaces/job-result.interface';
 
 @Injectable()
 export class JobProcessorService {
@@ -38,7 +38,7 @@ export class JobProcessorService {
     workerId?: number,
   ): Promise<any> {
     const jobData = job.data as JobData;
-    const timeoutMs = Math.max(1, (queueDef.timeout ?? 60) * 1000);
+    const timeoutMs = this.getTimeoutMs(queueDef);
     const workerInfo = workerId ? ` [Worker #${workerId}]` : '';
 
     this.logger.log(
@@ -46,40 +46,21 @@ export class JobProcessorService {
     );
 
     try {
-      let result = await this.cache.tryGetFromCache(jobData);
-
-      if (result) {
-        this.logger.log(
-          `[${queueName}]${workerInfo} Job ${job.id} served from CACHE`,
-        );
-
-        await this.saveJobResult(job, queueName, jobData, workerId, result, null);
-        return result;
-      }
-
-      this.logger.debug(
-        `[${queueName}]${workerInfo} Cache miss - dispatching job ${job.id} via NATS`,
+      const cached = await this.processFromCache(
+        job,
+        queueName,
+        jobData,
+        workerId,
       );
+      if (cached !== undefined) return cached;
 
-      result = await Promise.race([
-        this.dispatcher.dispatch(jobData, timeoutMs),
-        this.createTimeoutPromise(timeoutMs),
-      ]);
-
-      this.cache
-        .tryStoreInCache(jobData, result)
-        .catch((cacheError: Error) => {
-          this.logger.warn(
-            `Cache store failed for job ${job.id}: ${cacheError.message}`,
-          );
-        });
-
-      await this.saveJobResult(job, queueName, jobData, workerId, result, null);
-
-      this.logger.log(
-        `[${queueName}]${workerInfo} Job ${job.id} completed successfully`,
+      const result = await this.dispatchAndPersist(
+        job,
+        queueName,
+        jobData,
+        workerId,
+        timeoutMs,
       );
-
       return result;
     } catch (error) {
       const normalizedError = this.normalizeError(error);
@@ -88,10 +69,79 @@ export class JobProcessorService {
         `[${queueName}]${workerInfo} Job ${job.id} failed: ${normalizedError.message}`,
       );
 
-      await this.saveJobResult(job, queueName, jobData, workerId, null, normalizedError);
+      await this.saveJobResult(
+        job,
+        queueName,
+        jobData,
+        workerId,
+        null,
+        normalizedError,
+      );
 
       throw error;
     }
+  }
+
+  private async processFromCache(
+    job: Job,
+    queueName: string,
+    jobData: JobData,
+    workerId?: number,
+  ): Promise<any | undefined> {
+    const cached = await this.cache.tryGetFromCache(jobData);
+    if (!cached) return undefined;
+
+    const workerInfo = workerId ? ` [Worker #${workerId}]` : '';
+    this.logger.log(
+      `[${queueName}]${workerInfo} Job ${job.id} served from CACHE`,
+    );
+
+    await this.saveJobResult(
+      job,
+      queueName,
+      jobData,
+      workerId,
+      cached,
+      null,
+    );
+    return cached;
+  }
+
+  private async dispatchAndPersist(
+    job: Job,
+    queueName: string,
+    jobData: JobData,
+    workerId: number | undefined,
+    timeoutMs: number,
+  ) {
+    const workerInfo = workerId ? ` [Worker #${workerId}]` : '';
+    this.logger.debug(
+      `[${queueName}]${workerInfo} Cache miss - dispatching job ${job.id} via NATS`,
+    );
+
+    const result = await Promise.race([
+      this.dispatcher.dispatch(jobData, timeoutMs),
+      this.createTimeoutPromise(timeoutMs),
+    ]);
+
+    this.cache
+      .tryStoreInCache(jobData, result)
+      .catch((cacheError: Error) => {
+        this.logger.warn(
+          `Cache store failed for job ${job.id}: ${cacheError.message}`,
+        );
+      });
+
+    await this.saveJobResult(job, queueName, jobData, workerId, result, null);
+
+    this.logger.log(
+      `[${queueName}]${workerInfo} Job ${job.id} completed successfully`,
+    );
+    return result;
+  }
+
+  private getTimeoutMs(queueDef: QueueDefinition): number {
+    return Math.max(1, (queueDef.timeout ?? 60) * 1000);
   }
 
   private createTimeoutPromise(ms: number): Promise<never> {
@@ -234,3 +284,5 @@ export class JobProcessorService {
     return parsed;
   }
 }
+
+

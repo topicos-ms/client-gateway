@@ -1,7 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { PaginationService, IdempotencyService } from './services';
 import { RedisModule } from './redis/redis.module';
-import { HealthModule } from './health/health.module';
 import { QueueModule } from './queues/queue.module';
 import { InterceptorModule } from './interceptors/interceptor.module';
 import { WorkerModule } from './workers/worker.module';
@@ -13,7 +12,6 @@ import { TestingModule } from './testing/testing.module';
 @Module({
   imports: [
     RedisModule,
-    HealthModule,
     QueueModule,
     InterceptorModule,
     // Remover dependencias circulares temporalmente

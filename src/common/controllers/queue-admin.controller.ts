@@ -329,11 +329,14 @@ export class QueueAdminController {
         paused: workerStats.workers.details.filter((w) => w.status === 'paused')
           .length,
       },
-      memory: {
-        heapUsedMB: workerStats.memory.heapUsedMB,
-        heapTotalMB: workerStats.memory.heapTotalMB,
-        usagePercent: parseFloat(workerStats.memory.usagePercent) || 0,
-      },
+        memory: {
+          heapUsedMB: workerStats.memory.heapUsedMB,
+          heapTotalMB: workerStats.memory.heapTotalMB,
+          usagePercent:
+            typeof workerStats.memory.usagePercent === 'string'
+              ? parseFloat(workerStats.memory.usagePercent) || 0
+              : workerStats.memory.usagePercent || 0,
+        },
       uptime: workerStats.uptime,
     };
 

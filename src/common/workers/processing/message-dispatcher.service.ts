@@ -1,9 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+﻿import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { timeout } from 'rxjs/operators';
-import { NATS_SERVICE } from '../../config';
-import { JobData } from '../interceptors/interfaces/job-data.interface';
+import { NATS_SERVICE } from '../../../config';
+import { JobData } from '../../interceptors/interfaces/job-data.interface';
 
 const INTERNAL_ECHO_PATTERN = 'queue.test';
 
@@ -51,3 +51,5 @@ export class MessageDispatcherService {
     }
   }
 }
+
+

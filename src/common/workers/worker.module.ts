@@ -1,15 +1,13 @@
-import { Module, forwardRef } from '@nestjs/common';
+﻿import { Module, forwardRef } from '@nestjs/common';
 import { DynamicWorkerService } from './dynamic-worker.service';
-import { WorkerFactoryService } from './worker-factory.service';
-import { WorkerHealthService } from './worker-health.service';
-import { JobProcessorService } from './job-processor.service';
-import { MessageDispatcherService } from './message-dispatcher.service';
-import { JobCacheService } from './job-cache.service';
-import { WorkerResourceManagerService } from './worker-resource-manager.service';
-import { WorkerStatsService } from './worker-stats.service';
+import { WorkerFactoryService } from './factory/worker-factory.service';
+import { WorkerLifecycleService } from './lifecycle/worker-lifecycle.service';
+import { WorkerControlService } from './control/worker-control.service';
+import { JobProcessorService } from './processing/job-processor.service';
+import { MessageDispatcherService } from './processing/message-dispatcher.service';
+import { JobCacheService } from './cache/job-cache.service';
 import { QueueModule } from '../queues/queue.module';
 import { RedisModule } from '../redis/redis.module';
-import { MonitoringModule } from '../monitoring/monitoring.module';
 import { CacheModule } from '../cache/cache.module';
 import { WebSocketModule } from '../websockets/websocket.module';
 import { NatsModule } from '../../transports/nats.module';
@@ -18,7 +16,6 @@ import { NatsModule } from '../../transports/nats.module';
   imports: [
     forwardRef(() => QueueModule),
     RedisModule,
-    MonitoringModule,
     CacheModule.forRoot(),
     forwardRef(() => WebSocketModule),
     NatsModule,
@@ -26,22 +23,20 @@ import { NatsModule } from '../../transports/nats.module';
   providers: [
     DynamicWorkerService,
     WorkerFactoryService,
-    WorkerHealthService,
+    WorkerLifecycleService,
+    WorkerControlService,
     JobProcessorService,
     MessageDispatcherService,
     JobCacheService,
-    WorkerResourceManagerService,
-    WorkerStatsService,
   ],
   exports: [
     DynamicWorkerService,
     WorkerFactoryService,
-    WorkerHealthService,
+    WorkerLifecycleService,
+    WorkerControlService,
     JobProcessorService,
     MessageDispatcherService,
     JobCacheService,
-    WorkerResourceManagerService,
-    WorkerStatsService,
   ],
 })
 export class WorkerModule {}
