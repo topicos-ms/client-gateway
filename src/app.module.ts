@@ -9,6 +9,7 @@ import { FacilitiesModule } from './facilities/facilities.module';
 import { TeachingModule } from './teaching/teaching.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { AssessmentsModule } from './assessments/assessments.module';
+import { SeedingModule } from './common/seeding/seeding.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AssessmentsModule } from './assessments/assessments.module';
     }),
     CommonModule,
     NatsModule,
+    SeedingModule,
     AuthModule,
     ProgramsModule,
     CalendarModule,
